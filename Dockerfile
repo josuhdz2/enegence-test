@@ -1,18 +1,28 @@
-FROM php:8.3-fpm
+# Usa una imagen base de PHP, preferiblemente FPM para mejor rendimiento con Nginx
+FROM php:8.2-fpm
 
-# Instalar extensiones necesarias
+# Instala dependencias del sistema y extensiones de PHP necesarias
 RUN apt-get update && apt-get install -y \
-    git curl zip unzip libpq-dev libonig-dev libxml2-dev \
-    && docker-php-ext-install pdo pdo_mysql mbstring
+    git \
+    unzip \
+    libpng-dev \
+    libjpeg62-turbo-dev \
+    libfreetype6-dev \
+    && rm -rf /var/lib/apt/lists/*
 
-# Instalar Composer
-COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+RUN docker-php-ext-install pdo_mysql gd exif opcache
 
-# Configuración de la app
-WORKDIR /var/www
+# Instala Composer
+COPY --from=composer:latest /usr/bin/composer /usr/bin/composer
 
-COPY --chown=www-data:www-data . .
+# Configura el directorio de trabajo
+WORKDIR /var/www/html
 
-RUN composer install --no-interaction --prefer-dist --optimize-autoloader
+# La aplicación Laravel se montará aquí como un volumen en docker-compose
+# Por ahora, solo copiamos el script de entrada (entrypoint) si fuera necesario, 
+# pero para Laravel simple no lo es.
+
+# Exponemos el puerto FPM
+EXPOSE 9000
 
 CMD ["php-fpm"]
