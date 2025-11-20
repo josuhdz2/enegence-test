@@ -1,5 +1,5 @@
 # -------------------------------------------------------
-# STAGE 1 – Compilar assets con Node
+# STAGE 1 — Node: solo instalar dependencias
 # -------------------------------------------------------
 FROM node:20 AS node_builder
 
@@ -8,65 +8,61 @@ COPY package*.json ./
 RUN npm install
 
 COPY . .
-RUN npm run build
-
 
 
 # -------------------------------------------------------
-# STAGE 2 – Instalar dependencias con Composer
+# STAGE 2 — Composer dependencies
 # -------------------------------------------------------
 FROM composer:2 AS vendor_builder
 
 WORKDIR /app
 COPY composer.json composer.lock ./
-RUN composer install --no-dev --optimize-autoloader --no-scripts --no-interaction --prefer-dist
+RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
 COPY . .
-RUN composer install --no-dev --optimize-autoloader
-
+RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
 
 
 # -------------------------------------------------------
-# STAGE 3 – Imagen final: PHP-FPM + Nginx + Laravel
+# STAGE 3 — Imagen final (PHP-FPM + Nginx)
 # -------------------------------------------------------
 FROM php:8.2-fpm
 
-# ---------------------------
-# Instalar extensiones y Nginx
-# ---------------------------
 RUN apt-get update && apt-get install -y \
     nginx \
     supervisor \
-    libzip-dev zip unzip \
+    libzip-dev \
+    zip unzip \
+    git \
     && docker-php-ext-install pdo pdo_mysql zip \
     && apt-get clean
 
 WORKDIR /var/www
 
-# Copiar código del proyecto
+# Copiar proyecto
 COPY . .
 
-# Copiar vendor desde stage 2
+# Copiar vendors
 COPY --from=vendor_builder /app/vendor ./vendor
 
-# Copiar assets compilados desde stage 1
-COPY --from=node_builder /app/public/build ./public/build
+# Copiar node_modules al final
+COPY --from=node_builder /app/node_modules ./node_modules
+
+# -------------------------------------------------------
+# AHORA HACEMOS EL BUILD EN EL STAGE PHP
+# -------------------------------------------------------
+RUN npm run build
 
 # Permisos
 RUN chown -R www-data:www-data \
-    /var/www/storage \
-    /var/www/bootstrap/cache
+    storage \
+    bootstrap/cache
 
-# ---------------------------
-# Configuración de Nginx
-# ---------------------------
+# Copiar Nginx
 COPY ./docker/nginx.conf /etc/nginx/sites-available/default
 
-# ---------------------------
-# Configurar Supervisor (manejar PHP-FPM + Nginx)
-# ---------------------------
+# Copiar Supervisor
 COPY ./docker/supervisor.conf /etc/supervisor/conf.d/supervisor.conf
 
 EXPOSE 80
-
 CMD ["/usr/bin/supervisord"]
