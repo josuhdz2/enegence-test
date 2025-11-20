@@ -17,6 +17,3 @@ services:
       dockerfile: Dockerfile
     volumes:
       - ./:/var/www
-
-volumes:
-  mysql_data:
