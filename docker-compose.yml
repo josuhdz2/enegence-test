@@ -6,7 +6,7 @@ services:
       - "8000:80"
     volumes:
       - ./:/var/www
-      #- ./default.conf:/etc/nginx/conf.d/default.conf
+      - ../files/default.conf:/etc/nginx/conf.d/default.conf
     depends_on:
       - php
 
