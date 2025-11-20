@@ -1,48 +1,18 @@
-FROM node:20 AS node_builder
+FROM php:8.3-fpm
 
-WORKDIR /app
-COPY package*.json ./
-RUN npm install
-
-COPY . .
-
-FROM composer:2 AS vendor_builder
-
-WORKDIR /app
-COPY composer.json composer.lock ./
-RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
-
-COPY . .
-RUN composer install --no-dev --prefer-dist --no-interaction --optimize-autoloader
-
-FROM php:8.2-fpm
-
+# Instalar extensiones necesarias
 RUN apt-get update && apt-get install -y \
-    nginx \
-    supervisor \
-    libzip-dev \
-    zip unzip \
-    git \
-    && docker-php-ext-install pdo pdo_mysql zip \
-    && apt-get clean
+    git curl zip unzip libpq-dev libonig-dev libxml2-dev \
+    && docker-php-ext-install pdo pdo_mysql mbstring tokenizer xml
 
+# Instalar Composer
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
+# Configuración de la app
 WORKDIR /var/www
 
-COPY . .
+COPY --chown=www-data:www-data . .
 
-COPY --from=vendor_builder /app/vendor ./vendor
+RUN composer install --no-interaction --prefer-dist --optimize-autoloader
 
-COPY --from=node_builder /app/node_modules ./node_modules
-
-RUN npm run build
-
-RUN chown -R www-data:www-data \
-    storage \
-    bootstrap/cache
-
-COPY ./docker/nginx.conf /etc/nginx/sites-available/default
-
-COPY ./docker/supervisor.conf /etc/supervisor/conf.d/supervisor.conf
-
-EXPOSE 80
-CMD ["/usr/bin/supervisord"]
+CMD ["php-fpm"]
