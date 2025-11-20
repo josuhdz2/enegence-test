@@ -11,7 +11,7 @@ use Illuminate\Support\Facades\DB;
 
 class StateService{
     public function findAll(){
-        //$result=$this->update();
+        $result=$this->update();
         $states=State::all();
         return $states;
     }
